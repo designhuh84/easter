@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부활의 증인 되기</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  /* ── 변수 ── */
+  :root {
+    --bg: #ffffff;
+    --fg: #000000;
+    --mid: #888888;
+    --light: #e0e0e0;
+    --success-threshold: 70; /* JS에서도 동일하게 관리 */
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════
+     홈 화면
+  ═══════════════════════════ */
+  #page-home {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 48px;
+    text-align: center;
+    padding: 32px;
+  }
+
+  .home-title {
+    font-size: clamp(48px, 10vw, 96px);
+    letter-spacing: 0.08em;
+    line-height: 1;
+    font-weight: bold;
+  }
+
+  .home-subtitle {
+    font-size: 24px;
+    color: var(--fg);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 300;
+  }
+
+  /* 시작 버튼 */
+  #btn-start {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 2px solid var(--fg);
+    background: var(--bg);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.25s, color 0.25s;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #btn-start::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px solid var(--light);
+  }
+
+  #btn-start:hover { background: var(--fg); color: var(--bg); }
+  #btn-start:hover .mic-icon path,
+  #btn-start:hover .mic-icon rect { stroke: var(--bg); }
+
+  .mic-icon { width: 36px; height: 36px; }
+  .mic-icon path,
+  .mic-icon rect { stroke: var(--fg); stroke-width: 1.5; fill: none; stroke-linecap: round; }
+
+  #btn-start:hover .mic-icon path,
+  #btn-start:hover .mic-icon rect { stroke: var(--bg); }
+
+  .btn-label {
+    font-size: 24px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  /* ═══════════════════════════
+     측정 화면
+  ═══════════════════════════ */
+
+  .meter-title{
+    font-size: 72px;
+    font-weight: bold;
+    text-align: center;
+    width: 100%;
+  }
+
+  #page-meter {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    width: 100%;
+    max-width: 1024px;
+    padding: 32px 24px;
+  }
+
+  .meter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .meter-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .threshold-badge {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--mid);
+    border: 1px solid var(--light);
+    padding: 4px 10px;
+    border-radius: 2px;
+  }
+
+  /* 큰 숫자 디스플레이 */
+  .db-display {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .db-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(80px, 22vw, 140px);
+    line-height: 1;
+    transition: color 0.2s;
+    min-width: 3ch;
+    text-align: right;
+  }
+
+  .db-unit {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 28px;
+    letter-spacing: 0.1em;
+    color: var(--mid);
+    padding-bottom: 12px;
+  }
+
+  /* 바 그래프 */
+  .bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--light);
+    border-radius: 0;
+    position: relative;
+    overflow: visible;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: var(--fg);
+    width: 0%;
+    transition: width 0.1s linear;
+    border-radius: 0;
+    position: relative;
+  }
+
+  /* 임계값 마커 */
+  .threshold-marker {
+    position: absolute;
+    top: -10px;
+    width: 1px;
+    height: 26px;
+    background: var(--fg);
+  }
+
+  .threshold-marker::after {
+    content: attr(data-label);
+    position: absolute;
+    top: -18px;
+    left: 4px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    color: var(--mid);
+  }
+
+  /* 파형 캔버스 */
+  .waveform-wrap {
+    width: 100%;
+    height: 80px;
+    position: relative;
+  }
+
+  #waveform {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* 상태 표시 */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--mid);
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fg);
+    animation: blink 1s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* 중단 버튼 */
+  #btn-stop {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+    background: none;
+    border: 1px solid var(--fg);
+    color: var(--fg);
+    padding: 12px 32px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    outline: none;
+  }
+
+  #btn-stop:hover { background: var(--fg); color: var(--bg); }
+
+  /* ═══════════════════════════
+     성공 화면
+  ═══════════════════════════ */
+  #page-success {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 48px;
+    text-align: center;
+    padding: 32px;
+  }
+
+  .success-icon {
+    width: 80px;
+    height: 80px;
+    border: 2px solid var(--fg);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  @keyframes pop-in {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  .success-check {
+    width: 36px;
+    height: 36px;
+  }
+
+  .success-check polyline { stroke: var(--fg); stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  .success-title {
+    font-size: clamp(36px, 8vw, 64px);
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    animation: slide-up 0.6s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .success-peak {
+    font-size: 13px;
+    color: var(--mid);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    animation: slide-up 0.6s 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .success-peak strong {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--fg);
+    font-size: 15px;
+  }
+
+  @keyframes slide-up {
+    from { transform: translateY(24px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  #btn-home {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+    background: var(--fg);
+    border: none;
+    color: var(--bg);
+    padding: 14px 40px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    outline: none;
+    animation: slide-up 0.6s 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  #btn-home:hover { opacity: 0.7; }
+
+  /* 유틸 */
+  .page { position: absolute; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+</style>
+</head>
+<body>
+
+<!-- ══ 홈 ══ -->
+<div id="page-home" class="page">
+  <div>
+    <div class="home-title">부활의 증인 되기</div>
+    <br><br>
+    <div class="home-subtitle">
+      우리는 예수님의 부활을 증거하는 사람들 입니다.<br>
+      "예수님 부활하셨습니다!" 라고 크게 외쳐 주세요!<br>
+    </div>
+  </div>
+
+  <button id="btn-start" aria-label="마이크 시작">
+    <svg class="mic-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <rect x="9" y="2" width="6" height="11" rx="3"/>
+      <path d="M5 10a7 7 0 0 0 14 0"/>
+      <line x1="12" y1="17" x2="12" y2="21" stroke-width="1.5"/>
+      <line x1="8" y1="21" x2="16" y2="21" stroke-width="1.5"/>
+    </svg>
+    <span class="btn-label">시작</span>
+  </button>
+
+  <div class="home-subtitle">버튼을 눌러 소리를 측정하세요</div>
+</div>
+
+<!-- ══ 측정 ══ -->
+<div id="page-meter" class="page">
+  <div class="meter-title">예수님 부활하셨습니다!!</div>
+  <div class="meter-header">
+    <span class="meter-label">Live Monitoring</span>
+    <span class="threshold-badge" id="threshold-badge">목표: -- dB</span>
+  </div>
+
+  <div class="db-display">
+    <span class="db-value" id="db-value">--</span>
+    <span class="db-unit">dB</span>
+  </div>
+
+  <div style="width:100%;">
+    <div class="bar-track">
+      <div class="bar-fill" id="bar-fill"></div>
+      <div class="threshold-marker" id="threshold-marker" data-label="목표"></div>
+    </div>
+  </div>
+
+  <div class="waveform-wrap">
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <div class="status-row">
+    <div class="status-dot"></div>
+    <span>측정 중</span>
+  </div>
+
+  <button id="btn-stop">중단</button>
+</div>
+
+<!-- ══ 성공 ══ -->
+<div id="page-success" class="page">
+  <div class="success-icon">
+    <svg class="success-check" viewBox="0 0 24 24">
+      <polyline points="5,13 10,18 19,7"/>
+    </svg>
+  </div>
+
+  <div>
+    <div class="success-title">
+      축하합니다.<br>성공입니다!<br>
+      예수님은 부활하셨습니다!!!
+    </div>
+  </div>
+
+  <div class="success-peak">최고 데시벨 <strong id="peak-value">--</strong> dB</div>
+
+  <button id="btn-home">처음으로</button>
+</div>
+
+<script>
+  // ══════════════════════════════════
+  //  ★ 설정값 — 여기서 임계 데시벨 수정 ★
+  // ══════════════════════════════════
+  const SUCCESS_DB = 100;   // 이 값 이상이면 성공 페이지로 이동
+  const MAX_DB     = 120;  // 바 그래프 최댓값 기준
+  const MIN_DB     = 30;   // 바 그래프 최솟값 기준
+  // ══════════════════════════════════
+
+  const pageHome    = document.getElementById('page-home');
+  const pageMeter   = document.getElementById('page-meter');
+  const pageSuccess = document.getElementById('page-success');
+
+  const btnStart  = document.getElementById('btn-start');
+  const btnStop   = document.getElementById('btn-stop');
+  const btnHome   = document.getElementById('btn-home');
+
+  const dbValue        = document.getElementById('db-value');
+  const barFill        = document.getElementById('bar-fill');
+  const thresholdMarker= document.getElementById('threshold-marker');
+  const thresholdBadge = document.getElementById('threshold-badge');
+  const peakValue      = document.getElementById('peak-value');
+  const waveformCanvas = document.getElementById('waveform');
+  const wCtx           = waveformCanvas.getContext('2d');
+
+  let audioCtx, analyser, micStream, animFrame;
+  let peakDb = -Infinity;
+  let succeeded = false;
+
+  // ── 초기화 ──
+  function init() {
+    thresholdBadge.textContent = `목표: ${SUCCESS_DB} dB`;
+    // 임계 마커 위치 (%)
+    const markerPct = Math.max(0, Math.min(100, ((SUCCESS_DB - MIN_DB) / (MAX_DB - MIN_DB)) * 100));
+    thresholdMarker.style.left = markerPct + '%';
+  }
+  init();
+
+  // ── 페이지 전환 ──
+  function showPage(id) {
+    [pageHome, pageMeter, pageSuccess].forEach(p => p.style.display = 'none');
+    document.getElementById(id).style.display = 'flex';
+  }
+
+  // ── 마이크 시작 ──
+  btnStart.addEventListener('click', async () => {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (e) {
+      alert('마이크 접근 권한이 필요합니다.');
+      return;
+    }
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.6;
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+    source.connect(analyser);
+
+    peakDb = -Infinity;
+    succeeded = false;
+    showPage('page-meter');
+    resizeCanvas();
+    loop();
+  });
+
+  // ── 중단 ──
+  btnStop.addEventListener('click', stopMic);
+  function stopMic() {
+    cancelAnimationFrame(animFrame);
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    if (audioCtx) audioCtx.close();
+    showPage('page-home');
+  }
+
+  // ── 처음으로 ──
+  btnHome.addEventListener('click', () => showPage('page-home'));
+
+  // ── 측정 루프 ──
+  function loop() {
+    animFrame = requestAnimationFrame(loop);
+
+    const bufLen = analyser.fftSize;
+    const dataArr = new Float32Array(bufLen);
+    analyser.getFloatTimeDomainData(dataArr);
+
+    // RMS → dB
+    let sum = 0;
+    for (let i = 0; i < bufLen; i++) sum += dataArr[i] * dataArr[i];
+    const rms = Math.sqrt(sum / bufLen);
+    const db = rms > 0 ? 20 * Math.log10(rms) + 90 : 0; // offset 보정
+    const dbClamped = Math.max(0, Math.min(130, db));
+
+    // 표시
+    dbValue.textContent = Math.round(dbClamped);
+    if (dbClamped >= SUCCESS_DB - 10) {
+      dbValue.style.color = '#000';
+    }
+
+    // 바
+    const pct = Math.max(0, Math.min(100, ((dbClamped - MIN_DB) / (MAX_DB - MIN_DB)) * 100));
+    barFill.style.width = pct + '%';
+
+    // 피크
+    if (dbClamped > peakDb) peakDb = dbClamped;
+
+    // 파형
+    drawWaveform(dataArr);
+
+    // 성공 판정
+    if (!succeeded && dbClamped >= SUCCESS_DB) {
+      succeeded = true;
+      peakValue.textContent = Math.round(peakDb);
+      cancelAnimationFrame(animFrame);
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      if (audioCtx) audioCtx.close();
+      setTimeout(() => showPage('page-success'), 300);
+    }
+  }
+
+  // ── 파형 그리기 ──
+  function resizeCanvas() {
+    const wrap = waveformCanvas.parentElement;
+    waveformCanvas.width  = wrap.clientWidth;
+    waveformCanvas.height = wrap.clientHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function drawWaveform(data) {
+    const w = waveformCanvas.width;
+    const h = waveformCanvas.height;
+    wCtx.clearRect(0, 0, w, h);
+
+    wCtx.beginPath();
+    wCtx.strokeStyle = '#000';
+    wCtx.lineWidth = 1.5;
+
+    const step = Math.ceil(data.length / w);
+    const mid  = h / 2;
+
+    for (let i = 0; i < w; i++) {
+      const idx = i * step;
+      const v   = data[idx] || 0;
+      const y   = mid + v * mid * 2.5;
+      i === 0 ? wCtx.moveTo(i, y) : wCtx.lineTo(i, y);
+    }
+    wCtx.stroke();
+
+    // 중심선
+    wCtx.beginPath();
+    wCtx.strokeStyle = '#e0e0e0';
+    wCtx.lineWidth = 0.5;
+    wCtx.moveTo(0, mid);
+    wCtx.lineTo(w, mid);
+    wCtx.stroke();
+  }
+</script>
+</body>
+</html>
